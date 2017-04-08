@@ -1,0 +1,1404 @@
+REM **************************************************
+REM **
+REM ** PLATFORMER TUTORIAL 01
+REM **
+REM ** KGH 2010
+REM ** Edited by Damon Wareham 2012
+REM **************************************************
+
+REM ** Set up constant values
+#constant brick_type        = 1
+#constant Jewel_type        = 2
+#constant obj_z_pos         = 0.0
+#constant base_plain_num    = 20
+#constant Left_Move         = -1
+#constant Right_Move        = 1
+#constant Stationary        = 0
+
+
+REM ** Specify Object number ranges
+#constant Player_Obj_Num    5
+#constant Brick_Obj_Num_Src 31
+#constant Jewel_Obj_Num_Src 32
+
+#constant Jewel_Clone_Num   1000
+#constant Brick_Clone_Num   5000        
+
+REM ** Set up default resolution (change if required)
+set display mode 1024,768,32
+
+REM ** Define any data types
+type tVector
+    x as float
+    y as float
+endtype
+
+type maptype
+   col      as byte
+   block    as integer
+   id       as integer
+   state    as byte
+   marker$  as string
+endtype
+
+type tPlayer
+    id      as integer
+    pos     as tVector
+    sav     as tVector
+    xspeed  as float
+    yspeed  as float
+    frame   as float
+    smooth  as float
+    direction as float
+    height  as float
+    radius  as float
+endtype
+
+//adding new datatype
+type tSound
+	id		as integer
+	length  as integer
+	name	as string
+endtype
+
+//sounds
+#constant cSDOTHIT 1
+#constant cSJUMP 2
+#constant cSSUPERJUMP 3
+
+REM ** Declare global variables 
+global Billy as tPlayer
+Billy.id = Player_Obj_Num
+Billy.height = 6.5
+Billy.radius = 3.0
+
+set dir ".."
+
+REM ** Set up global variables
+global plf#
+global pli#
+global oplx#
+global oply#
+global pdir#
+global pdir
+global retx
+global rety
+global retx#
+global rety#
+global timer1
+global timer2
+global m //music
+global s //sound
+global v //rave
+global map //map number
+global startr
+global startg
+global startb
+global message
+global messagew
+global messageq
+global L1
+global L2
+global L3
+global L4
+global L5
+global L6
+global skip
+startr = 0 : startg = 255 : startb = 0
+
+`Set size of playing area
+global map_width=700 //increased map width
+global map_height=80
+
+
+`Block =           12
+global map_tran$=" @o"
+global jewel_count
+global jewel_score
+
+
+global dim char_col(2,2)
+global dim map(map_width,map_height) as maptype
+
+global curobj=100
+
+load music "media\backdrops\music1.mp3", 1 //loading music
+load music "media\backdrops\music2.mp3", 2
+load music "media\backdrops\music3.mp3", 3
+load music "media\backdrops\music4.mp3", 4
+load music "media\backdrops\music5.mp3", 5
+load music "media\backdrops\music6.mp3", 6
+load music "media\backdrops\levelwin.mp3", 7
+load music "media\backdrops\gamewin.mp3", 8
+//load image "media\backdrops\desert_mountains.png",backdrop_image_num	`loading custom background
+load image "media\backdrops\metal.png",metal_image //loading texture
+load image "media\backdrops\menu2.jpg", menu_image //loading metal image
+load sound "media\backdrops\sound1.wav", cSDOTHIT //loading sounds
+load sound "media\backdrops\sound2.wav", cSJUMP
+load sound "media\backdrops\sound3.wav", cSSUPERJUMP
+
+L1 = 0
+L2 = 0
+L3 = 0
+L4 = 0
+L5 = 0
+L6 = 0
+disable escapekey //custom esc menu
+startgame()
+function startgame()
+
+m = 0 //reset music
+s = 0 //reset sound
+v = 0 //reset rave
+map = 0 //reset map
+timer2 = 0 //reset timer
+skip = 0 //reset skip
+
+REM ** Load any required objects and images
+`Backdrop Images
+#constant backdrop_image_num = 10
+#constant metal_image = 567	`creating metal texture constant
+#constant menu_image = 568 `creating menu image constant
+
+`Block 1, Brick
+#constant cube_image_num = 31
+make object cube Brick_Obj_Num_Src,5.0 : hide object Brick_Obj_Num_Src
+
+`Block 2, Jewel
+#constant jewel_image_num = 32
+make object sphere Jewel_Obj_Num_Src, 2.0 : hide object Jewel_Obj_Num_Src
+`changed jewels to dots
+
+message = rnd(9)
+messagew = rnd(5)
+messageq = rnd(5)
+
+DisplaySplashScreen() //shows title screen
+
+DisplayInstructions() //shows insturctions
+
+musicscreen() //shows music screen
+
+soundscreen() //shows sound screen
+
+mapscreen() //shows map screen
+
+ravescreen() //shows rave screen
+
+//plays music chosen
+if m = 1 then loop music 1
+if m = 2 then loop music 2
+if m = 3 then loop music 3
+if m = 4 then loop music 4
+if m = 5 then loop music 5
+if m = 6 then loop music 6
+
+sync on
+sync rate 60
+autocam off
+autocam off
+
+jewel_count=0
+jewel_score=0
+
+`Call setup_map
+if map = 1 then Setup_Map()
+if map = 2 then Setup_Map2()
+if map = 3 then Setup_Map3()
+if map = 4 then Setup_Map4()
+if map = 5 then Setup_Map5()
+if map = 6 then Setup_MapFINAL()
+
+gosub build_map
+
+set camera range 20.0,1000.0
+
+
+`Make backdrop plains
+#constant plain_width = 146*7
+#constant plain_height = 87*5
+
+//for plain_count=0 to 4
+   //plain_obj_num = base_plain_num+plain_count
+   //make object plain plain_obj_num, plain_width, plain_height
+   //position object plain_obj_num, map_width*2.5, plain_count*50.0-rnd(32), 300+(plain_count*50)
+   //texture object plain_obj_num, backdrop_image_num
+   //scroll object texture plain_obj_num, rnd(100)/100.0, 0.0
+   //set object transparency plain_obj_num, 2
+   //set object texture plain_obj_num, 0, 0
+   //set object fog plain_obj_num, 1
+//next n
+
+#constant Billy_image_num = 5
+
+load object "media\characters\schlump.x",Billy.id : loop object Billy.id
+
+do
+
+   `64-400
+
+   if abs(camy#-Billy.pos.y)>20.0
+      if camy#>Billy.pos.y then dec camy#,1.0 : if camy#<Billy.pos.y then camy#=Billy.pos.y
+      if camy#<Billy.pos.y then inc camy#,1.0 : if camy#>Billy.pos.y then camy#=Billy.pos.y
+   endif
+   
+   if abs(camx#-Billy.pos.x)>20.0
+      if camx#>Billy.pos.x then dec camx#,1.0 : if camx#<Billy.pos.x then camx#=Billy.pos.x
+      if camx#<Billy.pos.x then inc camx#,1.0 : if camx#>Billy.pos.x then camx#=Billy.pos.x
+   
+   endif
+   if camy#<64 then camy#=64
+   if camy#>400 then camy#=400
+   position light 0,camx#,camy#+200.0,-153.0
+   position camera camx#,camy#,-110.0
+   rotate camera -1,0,0
+
+   update_player()
+   update_pickups()
+set text size 32
+set text font "comic sans ms"
+   ink rgb(255,255,255), rgb(255,255,255)
+ if map = 1 or map = 2 or map = 4 then box 0,0,160,30
+ if map = 3 or map = 5 or map = 6 then box 0,0,390,30
+ink rgb(0,0,0),rgb(0,0,0)
+   if map = 1 or map = 2 or map = 4 then text 0,0,"Dots: "+str$(jewel_score)+"\"+str$(jewel_count)
+   if map = 3 or map = 5 then text 0,0,"Reach the finish and get the dot!"
+   if map = 6 then text 0,0,"Final level! Get that dot!"
+   
+	if v = 1 then rave()
+   sync
+   
+   if L6 = 1 and keystate(29) = 1 then skip = 1 : jewel_score = jewel_count //chuck norris button when game is beaten
+   if map = 1 and jewel_score = jewel_count or map = 2 and jewel_score = jewel_count or map = 4 and jewel_score = jewel_count then wait 500 : endgame() //ends game when all dots collected
+   if map = 3 and jewel_score = jewel_count or map = 5 and jewel_score = jewel_count then wait 500 : endgame2() //ends game when all dots collected
+	if map = 6 and jewel_score = jewel_count then wait 500 : endgame3()
+	
+   if keystate(25) = 1 then pause() //pause function
+   if keystate(1) = 1 then exitscreen() //new esckey menu
+
+loop
+
+`Sub routines
+`-------------------------------------------------------------------------------------
+
+`-------------------------------------------------------------------------------------
+build_map:
+for y=0 to map_height
+   for x=0 to map_width
+
+      curobj=((y*(map_width+1))+x)+1000
+      if object exist(curobj)=1 then delete object curobj
+
+      `** The screen is divided into 5x5 rectangles.
+      `** When an object is to be positioned, it needs to be
+      `** placed at the centre of a rectangle
+      `** Determine the centre of the current rectangle
+      centre_x#=(x*5.0)+2.5
+      centre_y#=(y*5.0)+2.5
+
+      if map(x,y).block=brick_type  `Brick
+         map(x,y).id=curobj
+         clone object curobj,Brick_Obj_Num_Src
+         scale object curobj,100,100,150
+         `scale object curobj,100,100,200-rnd(50)
+         if v = 2 or v = 2 then r=rnd(255) : g=rnd(255) : b=rnd(255)					
+         if v = 2 then color object curobj,rgb(r,g,b)						
+         if v = 1 or v = 3 then texture object curobj, metal_image    
+         if v = 2 then set object emissive curobj,rgb(r/4,g/4,b/4)
+         position object curobj,centre_x#,centre_y#,obj_z_pos
+      endif
+
+      if map(x,y).block=Jewel_type  `Jewel
+         inc jewel_count,1
+         map(x,y).id=curobj
+         map(x,y).state=0
+         clone object curobj,Jewel_Obj_Num_Src
+         //r=rnd(255) : g=rnd(255) : b=rnd(255)
+         //color object curobj,rgb(r,g,b)
+         
+         //set object emissive curobj,rgb(r/2,g/2,b/2)
+         ghost object on curobj
+         position object curobj,centre_x#,centre_y#,obj_z_pos
+      endif
+
+
+   next x
+next y
+
+
+return
+
+endfunction
+function Setup_Map()
+REM ** Note that this map 'looks' two-dim and follows
+REM ** the conventional two-dim screen where x and y
+REM ** start in the top left hand corner of the screen and move
+REM ** down and right. When the game plays, it will be in a 3-dim 
+REM ** world where x and y start in the centre of the world and
+REM ** move up and right. This means that when we build our map
+REM ** 
+   `           000000000011111111112222222222333
+   `       ##  012345678901234567890123456789012
+   map_set( 0,"EEEEEEEEEEEEEEEEEEEEEEE                                                                                                                                                                                                                                                                      ")//1
+   map_set( 1,"@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                                                                                                                                                                                                                           ")//1
+   map_set( 2,"@            ooooooo                                             @                                                                                                                                                                                                                           ")//1
+   map_set( 3,"@           ooooooooo                                            @                                                                                                                                                                                                                           ")//1
+   map_set( 4,"@                                                                @                                                                                                                                                                                                                           ")//1
+   map_set( 5,"@           @@@@@@@@@                                            @                                                                                                                                                                                                                           ")//1
+   map_set( 6,"@                                                                @                                                                                                                                                                                                                           ")//1
+   map_set( 7,"@                        @@                                      @                                                                                                                                                                                                                           ")//1
+   map_set( 8,"@                                                                @                                                                                                                                                                                                                           ")//1
+   map_set( 9,"@    ooo                                                         @                                                                                                                                                                                                                           ")//1
+   map_set(10,"@    ooo                                                         @                                                                                                                                                                                                                           ")//1
+   map_set(11,"@    @@@               @@@@@@@               ooooooo             @                                                                                                                                                                                                                           ")//1
+   map_set(12,"@                                        @@@@@@@@@@@@@@          @                                                                                                                                                                                                                           ")//1
+   map_set(13,"@                               @@@@                             @                                                                                                                                                                                                                           ")//1
+   map_set(14,"@           @@@@@@                                               @                                                                                                                                                                                                                           ")//1
+   map_set(15,"@                                                    @@@@@       @                                                                                                                                                                                                                           ")//1
+   map_set(16,"@ ooo                           @                              oo@                                                                                                                                                                                                                           ")//1
+   map_set(17,"@ ooo                           @                           @@@@@@                                                                                                                                                                                                                           ")//1
+   map_set(18,"@@@@@@@@@@@@@                   @             oo                 @                                                                                                                                                                                                                           ")//1
+   map_set(19,"@              @            oooo@             @@@@               @                                                                                                                                                                                                                           ")//1
+   map_set(20,"@     ooo                       @                                @                                                                                                                                                                                                                           ")//1
+   map_set(21,"@     ooo           @@       @@ @           @                    @                                                                                                                                                                                                                           ")//1
+   map_set(22,"@                  @  @@@       @                                @                                                                                                                                                                                                                           ")//1
+   map_set(23,"@                               @  oooo                          @                                                                                                                                                                                                                           ")//1
+   map_set(24,"@              @@               @@@@@@@@@@@        @@            @                                                                                                                                                                                                                           ")//1
+   map_set(25,"@   o                           @                                @                                                                                                                                                                                                                           ")//1
+   map_set(26,"@                               @                                @                                                                                                                                                                                                                           ")//1
+   map_set(27,"@         @@                    @                        @@@@@@@ @                                                                                                                                                                                                                           ")//1
+   map_set(28,"@                ooo            @                                @                                                                                                                                                                                                                           ")//1
+   map_set(29,"@                               @                                @                                                                                                                                                                                                                           ")//1
+   map_set(30,"@                 @@            @                                @                                                                                                                                                                                                                           ")//1
+   map_set(31,"@                               @                @@@@@           @                                                                                                                                                                                                                           ")//1
+   map_set(32,"@                      @@       @ oo                             @                                                                                                                                                                                                                           ")//1
+   map_set(33,"@                               @                                @                                                                                                                                                                                                                           ")//1
+   map_set(34,"@               @@              @@@@@@@@@@@@@                    @                                                                                                                                                                                                                           ")//1
+   map_set(35,"@                               @                                @                                                                                                                                                                                                                           ")//1
+   map_set(36,"@              oooo             @                                @                                                                                                                                                                                                                           ")//1
+   map_set(37,"@                               @                                @                                                                                                                                                                                                                           ")//1
+   map_set(38,"@       @@                      @                         ooooo  @                                                                                                                                                                                                                           ")//1
+   map_set(39,"@                               @               @@@@@@@@@@@@@@@@@@                                                                                                                                                                                                                           ")//1
+   map_set(40,"@               @               @                                @                                                                                                                                                                                                                           ")//1
+   map_set(41,"@                               @                                @                                                                                                                                                                                                                           ")//1
+   map_set(42,"@            ooo                @                                @                                                                                                                                                                                                                           ")//1
+   map_set(43,"@ o                  @@         @  ooo                           @                                                                                                                                                                                                                           ")//1
+   map_set(44,"@                               @@@@@@@@@@@@@@                   @                                                                                                                                                                                                                           ")//1
+   map_set(45,"@                               @                                @                                                                                                                                                                                                                           ")//1
+   map_set(46,"@                               @                           oo   @                                                                                                                                                                                                                           ")//1
+   map_set(47,"@            @@@@@@@@@@@@@@@@@@@@                       @@@@@@@@@@                                                                                                                                                                                                                           ")//1
+   map_set(48,"@                     ooooooo   @              oo                @                                                                                                                                                                                                                           ")//1
+   map_set(49,"@                               @             @@@@               @                                                                                                                                                                                                                           ")//1
+   map_set(50,"@    @@@                        @                                @                                                                                                                                                                                                                           ")//1
+   map_set(51,"@                               @ooooooo                         @                                                                                                                                                                                                                           ")//1
+   map_set(52,"@                               @@@@@@@@@@@@@@@@@@@@@@@@         @                                                                                                                                                                                                                           ")//1
+   map_set(53,"@                    oo         @                                @                                                                                                                                                                                                                           ")//1
+   map_set(54,"@          @@@@                 @                              @@@                                                                                                                                                                                                                           ")//1
+   map_set(55,"@                               @                                @                                                                                                                                                                                                                           ")//1
+   map_set(56,"@                     @@        @                          @     @                                                                                                                                                                                                                           ")//1
+   map_set(57,"@                          o    @                 @@             @                                                                                                                                                                                                                           ")//1
+   map_set(58,"@                               @                                @                                                                                                                                                                                                                           ")//1
+   map_set(59,"@                       @@@@@   @                                @                                                                                                                                                                                                                           ")//1
+   map_set(60,"@                               @                 oo             @                                                                                                                                                                                                                           ")//1
+   map_set(61,"@                               @                         @@@@@@ @                                                                                                                                                                                                                           ")//1
+   map_set(62,"@                               @                @@@@            @                                                                                                                                                                                                                           ")//1
+   map_set(63,"@              ooooo            @                                @                                                                                                                                                                                                                           ")//1
+   map_set(64,"@                               @oooooo          oo              @                                                                                                                                                                                                                           ")//1
+   map_set(65,"@            @@@@@@@@           @@@@@@@@                         @                                                                                                                                                                                                                           ")//1
+   map_set(66,"@                          o    @              @@@               @                                                                                                                                                                                                                           ")//1
+   map_set(67,"@                               @                       oo       @                                                                                                                                                                                                                           ")//1
+   map_set(68,"@            ooo          @@    @                      @@@@      @                                                                                                                                                                                                                           ")//1
+   map_set(69,"@                               @                                @                                                                                                                                                                                                                           ")//1
+   map_set(70,"@                     ooo       @   oooooooooo                   @                                                                                                                                                                                                                           ")//1
+   map_set(71,"@                               @                                @                                                                                                                                                                                                                           ")//1
+   map_set(72,"@                               @        @@@@@@                  @                                                                                                                                                                                                                           ")//1
+   map_set(73,"@                 @@@@@@@@@@@   @                                @                                                                                                                                                                                                                           ")//1
+   map_set(74,"@        oo                     @                                @                                                                                                                                                                                                                           ")//1
+   map_set(75,"@      @@@@@       o            @      o                 o       @                                                                                                                                                                                                                           ")//1
+   map_set(76,"@                               @                    @@@@@@@     @                                                                                                                                                                                                                           ")//1
+   map_set(77,"@                                                                @                                                                                                                                                                                                                           ")//1
+   map_set(78,"@                                                                @                                                                                                                                                                                                                           ")//1
+   map_set(79,"@oooooooo               S       oooooooo                         @                                                                                                                                                                                                                           ")//1
+   map_set(80,"@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                                                                                                                                                                                                                           ")//1
+
+endfunction
+function Setup_Map2()
+   map_set( 0,"EEEEEEEEEEEEEEEEEEEEEEE                                                                                                                                                                                                                                                                      ")//2
+   map_set( 1,"@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                                                                                                                                                                                                                                                   ")//2
+   map_set( 2,"@                        oooooooooo      @                                                                                                                                                                                                                                                   ")//2
+   map_set( 3,"@                               oooooo   @                                                                                                                                                                                                                                                   ")//2
+   map_set( 4,"@                        ooooooo      oo @                                                                                                                                                                                                                                                   ")//2
+   map_set( 5,"@                  @@@@@@@@@@@@@@@@@@@@@@@                                                                                                                                                                                                                                                   ")//2
+   map_set( 6,"@                                  oooooo@                                                                                                                                                                                                                                                   ")//2 
+   map_set( 7,"@              o                    ooooo@                                                                                                                                                                                                                                                   ")//2
+   map_set( 8,"@             @@@                        @                                                                                                                                                                                                                                                   ")//2
+   map_set( 9,"@                                        @                                                                                                                                                                                                                                                   ")//2
+   map_set(10,"@                             o          @                                                                                                                                                                                                                                                   ")//2
+   map_set(11,"@ oooo                      @@@@@@       @                                                                                                                                                                                                                                                   ")//2
+   map_set(12,"@@@@@@@                                  @                                                                                                                                                                                                                                                   ")//2
+   map_set(13,"@                                        @                                                                                                                                                                                                                                                   ")//2
+   map_set(14,"@                                        @@@@@@@@@@@@@@@@@@@@@@@@@                                                                                                                                                                                                                           ")//2
+   map_set(15,"@                                                                @                                                                                                                                                                                                                           ")//2
+   map_set(16,"@ oooooo                                                         @                                                                                                                                                                                                                           ")//2
+   map_set(17,"@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                   @                                                                                                                                                                                                                           ")//2
+   map_set(18,"@             ooooooooooooooooooo            @                   @                                                                                                                                                                                                                           ")//2
+   map_set(19,"@                                            @oo                 @                                                                                                                                                                                                                           ")//2
+   map_set(20,"@                                            @@@@@               @                                                                                                                                                                                                                           ")//2
+   map_set(21,"@                                            @                   @                                                                                                                                                                                                                           ")//2
+   map_set(22,"@                                            @         oo        @                                                                                                                                                                                                                           ")//2
+   map_set(23,"@               @@@@@@@@@@@@@                @         @@        @                                                                                                                                                                                                                           ")//2
+   map_set(24,"@                           @                @                   @                                                                                                                                                                                                                           ")//2
+   map_set(25,"@ooo                        @                @                   @                                                                                                                                                                                                                           ")//2
+   map_set(26,"@@@@@@@@@                 oo@               o@                 oo@                                                                                                                                                                                                                           ")//2
+   map_set(27,"@                     @@@@@@@             @@@@               @@@@@                                                                                                                                                                                                                           ")//2
+   map_set(28,"@                           @                @                   @                                                                                                                                                                                                                           ")//2
+   map_set(29,"@                           @                @                   @                                                                                                                                                                                                                           ")//2
+   map_set(30,"@                           @                @                   @                                                                                                                                                                                                                           ")//2
+   map_set(31,"@                           @                @                   @                                                                                                                                                                                                                           ")//2
+   map_set(32,"@                           @                @                   @                                                                                                                                                                                                                           ")//2
+   map_set(33,"@        oooo               @ooo             @                   @                                                                                                                                                                                                                           ")//2
+   map_set(34,"@      @@@@@@@@@            @@@@@@@@         @                   @                                                                                                                                                                                                                           ")//2
+   map_set(35,"@                           @                @         oo        @                                                                                                                                                                                                                           ")//2
+   map_set(36,"@                           @               o@        @@@        @                                                                                                                                                                                                                           ")//2
+   map_set(37,"@                           @               @@                   @                                                                                                                                                                                                                           ")//2
+   map_set(38,"@                           @                @                   @                                                                                                                                                                                                                           ")//2
+   map_set(39,"@                        ooo@oooooo          @                   @                                                                                                                                                                                                                           ")//2
+   map_set(40,"@                   @@@@@@@@@@@@@@@@@@       @                   @                                                                                                                                                                                                                           ")//2
+   map_set(41,"@                           @                @                   @                                                                                                                                                                                                                           ")//2
+   map_set(42,"@                           @                @ooo                @                                                                                                                                                                                                                           ")//2
+   map_set(43,"@ooo                        @                @@@@@@              @                                                                                                                                                                                                                           ")//2
+   map_set(44,"@@@@@@@@@@                  @                @                   @                                                                                                                                                                                                                           ")//2
+   map_set(45,"@                           @               o@                   @                                                                                                                                                                                                                           ")//2
+   map_set(46,"@                           @           @@@@@@                   @                                                                                                                                                                                                                           ")//2
+   map_set(47,"@                           @                @                   @                                                                                                                                                                                                                           ")//2
+   map_set(48,"@                           @                @                   @                                                                                                                                                                                                                           ")//2
+   map_set(49,"@                           @              ooooo                 @                                                                                                                                                                                                                           ")//2
+   map_set(50,"@                           @                                    @                                                                                                                                                                                                                           ")//2
+   map_set(51,"@                           @                                    @                                                                                                                                                                                                                           ")//2
+   map_set(52,"@oooooo                     @                    oooooooooooooooo@                                                                                                                                                                                                                           ")//2
+   map_set(53,"@@@@@@@@@@@@@           @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                                                                                                                                                                                                                           ")//2
+   map_set(54,"@                       @                                        @                                                                                                                                                                                                                           ")//2
+   map_set(55,"@                       @                                        @                                                                                                                                                                                                                           ")//2
+   map_set(56,"@                       @                                        @                                                                                                                                                                                                                           ")//2
+   map_set(57,"@       oooo            @     o                                  @                                                                                                                                                                                                                           ")//2
+   map_set(58,"@     @@@@@@@@          @    @@@          oo                     @                                                                                                                                                                                                                           ")//2
+   map_set(59,"@                       @              @@@@@@@                   @                                                                                                                                                                                                                           ")//2
+   map_set(60,"@                    ooo@           @                            @                                                                                                                                                                                                                           ")//2
+   map_set(61,"@                 @@@@@@@      S    @                            @                                                                                                                                                                                                                           ")//2
+   map_set(62,"@                       @           @                ooooo       @                                                                                                                                                                                                                           ")//2
+   map_set(63,"@                       @oo        o@              @@@@@@@@@     @                                                                                                                                                                                                                           ")//2
+   map_set(64,"@oooooo                 @@@@@@@@@@@@@                            @                                                                                                                                                                                                                           ")//2
+   map_set(65,"@@@@@@@@@@@@                                                     @                                                                                                                                                                                                                           ")//2
+   map_set(66,"@                                                                @                                                                                                                                                                                                                           ")//2
+   map_set(67,"@                                                                @                                                                                                                                                                                                                           ")//2
+   map_set(68,"@                                                                @                                                                                                                                                                                                                           ")//2
+   map_set(69,"@                                                       ooooooooo@                                                                                                                                                                                                                           ")//2
+   map_set(70,"@@@@@@@@@@@@@@@@@@@@@@@@@        @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                                                                                                                                                                                                                           ")//2
+   map_set(71,"@                                                                @                                                                                                                                                                                                                           ")//2
+   map_set(72,"@                                                                @                                                                                                                                                                                                                           ")//2
+   map_set(73,"@                                                                @                                                                                                                                                                                                                           ")//2
+   map_set(74,"@          ooooooooo                   ooooooooooo               @                                                                                                                                                                                                                           ")//2
+   map_set(75,"@      @@@@@@@@@@@@@@@@@@         @@@@@@@@@@@@@@@@@@@@@@         @                                                                                                                                                                                                                           ")//2
+   map_set(76,"@                                                                @                                                                                                                                                                                                                           ")//2
+   map_set(77,"@                                                                @                                                                                                                                                                                                                           ")//2
+   map_set(78,"@                                                                @                                                                                                                                                                                                                           ")//2
+   map_set(79,"@oooooooooo                                     ooooooooooo      @                                                                                                                                                                                                                           ")//2
+   map_set(80,"@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                                                                                                                                                                                                                           ")//2
+
+endfunction
+function Setup_Map3()
+   map_set( 0,"EEEEEEEEEEEEEEEEEEEEEEE                                                                                                                                                                                                                                                                      ") //3
+   map_set( 1,"@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                                                                                                                                                                                                                           ") //3
+   map_set( 2,"@                                                                @                                                                                                                                                                                                                           ") //3
+   map_set( 3,"@                                                                @                                                                                                                                                                                                                           ") //3
+   map_set( 4,"@        @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@        @                                                                                                                                                                                                                           ") //3
+   map_set( 5,"@        @                                              @        @                                                                                                                                                                                                                           ") //3
+   map_set( 6,"@        @                                              @        @                                                                                                                                                                                                                           ") //3
+   map_set( 7,"@        @                                              @        @                                                                                                                                                                                                                           ") //3
+   map_set( 8,"@        @         @@@@@@@@@@@@@@@@@@@@@@@@@@@@         @        @                                                                                                                                                                                                                           ") //3
+   map_set( 9,"@        @         @                          @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(10,"@        @         @                          @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(11,"@        @         @                          @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(12,"@        @         @        @@@@@@@@@@@@      @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(13,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(14,"@      @@@         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(15,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(16,"@        @         @        @     @@@@@@@@@@@@@         @        @                                                                                                                                                                                                                           ") //3
+   map_set(17,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(18,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(19,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(20,"@        @       @@@        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(21,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(22,"@        @         @        @@@@@@@@@@@@@@@   @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(23,"@        @         @      @@@                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(24,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(25,"@@@      @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(26,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(27,"@        @         @        @      @@@@@@@@@@@@         @        @                                                                                                                                                                                                                           ") //3 
+   map_set(28,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(29,"@        @@@       @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(30,"@        @         @@@      @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(31,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(32,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(33,"@        @         @        @@@@@@@@@@@@@@    @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(34,"@      @@@         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(35,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(36,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(37,"@        @         @      @@@                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(38,"@        @         @        @     @@@@@@@@@@@@@         @        @                                                                                                                                                                                                                           ") //3
+   map_set(39,"@        @       @@@        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(40,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(41,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(42,"@@@      @         @        @@@@@@@@@@@@@@    @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(43,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(44,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(45,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(46,"@        @         @@@      @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(47,"@      @@@         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(48,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(49,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(50,"@        @@@       @      @@@   @@@@@@@@@@@@@@@         @        @                                                                                                                                                                                                                           ") //3
+   map_set(51,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(52,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(53,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(54,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(55,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(56,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(57,"@        @         @        @@@@@@@@@@@@@@    @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(58,"@@@      @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(59,"@        @         @@@      @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(60,"@        @       @@@        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(61,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(62,"@        @         @        @    @@@@@@@@@@@@@@         @        @                                                                                                                                                                                                                           ") //3
+   map_set(63,"@      @@@         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(64,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(65,"@        @         @        @@@@@@@@@@@@@@    @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(66,"@        @         @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(67,"@        @@@       @        @                 @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(68,"@        @         @      @@@o                @         @        @                                                                                                                                                                                                                           ") //3
+   map_set(69,"@@@      @         @        @@@@@@@@@@@@@@@@@@@         @        @                                                                                                                                                                                                                           ") //3
+   map_set(70,"@        @         @                                    @        @                                                                                                                                                                                                                           ") //3
+   map_set(71,"@        @         @                                    @        @                                                                                                                                                                                                                           ") //3
+   map_set(72,"@        @         @                                    @        @                                                                                                                                                                                                                           ") //3
+   map_set(73,"@        @         @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@        @                                                                                                                                                                                                                           ") //3
+   map_set(74,"@      @@@                                                       @                                                                                                                                                                                                                           ") //3
+   map_set(75,"@        @                                                       @                                                                                                                                                                                                                           ") //3
+   map_set(76,"@        @                                                       @                                                                                                                                                                                                                           ") //3
+   map_set(77,"@        @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                                                                                                                                                                                                                           ") //3
+   map_set(78,"@                                                                @                                                                                                                                                                                                                           ") //3
+   map_set(79,"@                                                             S  @                                                                                                                                                                                                                           ") //3
+   map_set(80,"@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                                                                                                                                                                                                                           ") //3
+
+endfunction
+
+
+function Setup_Map4()
+   map_set( 0,"EEEEEEEEEEEEEEEEEEEEEEE                                                                                                                                                                                                                                                                      ") //4
+   map_set( 1,"@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                                                                                                                                                                                                                                                          ") //4
+   map_set( 2,"@                                 @                                                                                                                                                                                                                                                          ") //4
+   map_set( 3,"@                                 @                                                                                                                                                                                                                                                          ") //4
+   map_set( 4,"@                                 @                                                                                                                                                                                                                                                          ") //4
+   map_set( 5,"@                                 @                                                                                                                                                                                                                                                          ") //4
+   map_set( 6,"@                                 @                                                                                                                                                                                                                                                          ") //4
+   map_set( 7,"@                                 @                                                                                                                                                                                                                                                          ") //4
+   map_set( 8,"@                                 @                                                                                                                                                                                                                                                          ") //4
+   map_set( 9,"@            S                    @                                                                                                                                                                                                                                                          ") //4
+   map_set(10,"@       @@@@@@@@@oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(11,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(12,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(13,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(14,"@      o@       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(15,"@      @@       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(16,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(17,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(18,"@o      @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(19,"@@@     @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(20,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(21,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(22,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(23,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(24,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(25,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(26,"@      o@       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(27,"@     @@@       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4 
+   map_set(28,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(29,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(30,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(31,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(32,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(33,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(34,"@o      @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(35,"@@@     @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(36,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(37,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(38,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(39,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(40,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(41,"@      o@       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(42,"@     @@@       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(43,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(44,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(45,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(46,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(47,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(48,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(49,"@o      @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(50,"@@@     @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(51,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(52,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(53,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(54,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(55,"@      o@       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(56,"@     @@@       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(57,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(58,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(59,"@o      @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(60,"@@@     @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(61,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(62,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(63,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(64,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(65,"@      o@       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(66,"@     @@@       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(67,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(68,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(69,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(70,"@o      @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(71,"@@@     @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(72,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(73,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(74,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(75,"@       @       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(76,"@      o@       @oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(77,"@    @@@@@@@@@@@@oo@@@oo@@@oo@@@oo@                                                                                                                                                                                                                                                          ") //4
+   map_set(78,"@                                 @                                                                                                                                                                                                                                                          ") //4
+   map_set(79,"@ooooooooooooooooooooooooooooooooo@                                                                                                                                                                                                                                                          ") //4
+   map_set(80,"@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                                                                                                                                                                                                                                                          ") //4
+
+endfunction
+
+
+function Setup_Map5()
+	
+	map_set( 0,"                                                                                                                                                                                                                                                                                            ")
+	map_set( 1,"                                                                                                                                                                                                                                                                                            ")
+	map_set( 2,"                                                                                                                                                                                                                                                                                            ")
+	map_set( 3,"                                                                                                                                                                                                                                                                                            ")
+	map_set( 4,"                                                                                                                                                                                                                                                                                            ")
+	map_set( 5,"                                                                                                                                                                                                                                                                                            ")
+	map_set( 6,"                                                                                                                                                                                                                                                                                            ")
+	map_set( 7,"                                                                                                                                                                                                                                                                                            ")
+	map_set( 8,"                                                                                                                                                                                                                                                                                            ")
+	map_set( 9,"                                                                                                                                                                                                                                                                                            ")
+	map_set(10,"                                                                                                                                                                                                                                                                                            ")
+	map_set(11,"                                                                                                                                                                                                                                                                                            ")
+	map_set(12,"                                                                                                                                                                                                                                                                                            ")
+	map_set(13,"                                                                                                                                                                                                                                                                                            ")
+	map_set(14,"                                                                                                                                                                                                                                                                                            ")
+	map_set(15,"                                                                                                                                                                                                                                                                                            ")
+	map_set(16,"                                                                                                                                                                                                                                                                                            ")
+	map_set(17,"                                                                                                                                                                                                                                                                                            ")
+	map_set(18,"                                                                                                                                                                                                                                                                                            ")
+	map_set(19,"                                                                                                                                                                                                                                                                                            ")
+	map_set(20,"                                                                                                                                                                                                                                                                                            ")
+	map_set(21,"                                                                                                                                                                                                                                                                                            ")
+	map_set(22,"                                                                                                                                                                                                                                                                                            ")
+	map_set(23,"                                                                                                                                                                                                                                                                                            ")
+	map_set(24,"                                                                                                                                                                                                                                                                                            ")
+	map_set(25,"                                                                                                                                                                                                                                                                                            ")
+	map_set(26,"                                                                                                                                                                                                                                                                                            ")
+	map_set(27,"                                                                                                                                                                                                                                                                                            ")
+	map_set(28,"                                                                                                                                                                                                                                                                                            ")
+	map_set(29,"                                                                                                                                                                                                                                                                                            ")
+	map_set(30,"                                                                                                                                                                                                                                                                                            ")
+	map_set(31,"                                                                                                                                                                                                                                                                                            ")
+	map_set(32,"                                                                                                                                                                                                                                                                                            ")
+	map_set(33,"                                                                                                                                                                                                                                                                                            ")
+	map_set(34,"                                                                                                                                                                                                                                                                                            ")
+	map_set(35,"                                                                                                                                                                                                                                                                                            ")
+	map_set(36,"@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+	map_set(37,"@                                                                                                                                                                                                                                                                                          @")
+	map_set(38,"@                                                                                                                                                                                                                                                                                          @")
+	map_set(39,"@                                                                                                                                                                                                                                                                                          @")
+	map_set(40,"@                                                                                                                                                                                                                                                                                          @")
+	map_set(41,"@                                                                                                                                                                                                                                                                                          @")
+	map_set(42,"@                                                                                                                                                                                                                                                                                          @")
+	map_set(43,"@                                                                                                                                                                                                                                                                                          @")
+	map_set(44,"@                                                                                                                                                                                                                                                                                          @")
+	map_set(45,"@                                                                                                                                                                                                                                                                                          @")
+	map_set(46,"@                                                                                                                                                                                                                                                                                          @")
+	map_set(47,"@                                                                                                                                                                                                                                                                                          @")
+	map_set(48,"@                                                                                                                                                                                                                                                                                          @")
+	map_set(49,"@                                                                                                                                                                                                                                                                                          @")
+	map_set(50,"@                                                                                                                                                                                                                                                                                          @")
+	map_set(51,"@                                                                                                                                                                                                                                                                                          @")
+	map_set(52,"@                                                                                                                                                                                                                                                                                          @")
+	map_set(53,"@                                                                                                                                                                                                                                                                                          @")
+	map_set(54,"@                                                                                                                                                                                                                                                                                          @")
+	map_set(55,"@                                                                                                                                                                                                                                                                                          @")
+	map_set(56,"@                                                                                                                                                                                                                                                                                          @")
+	map_set(57,"@                                                                                                                                                                                                                                                                                          @")
+	map_set(58,"@                                                                                                                             @@@@@                                                                                                                                                        @")
+	map_set(59,"@     S                                                                         @@@@@@@@@                                                                                                                                       @@@@@@@@@                                                 o@")
+	map_set(60,"@    @@@@@@@@@@@@@@@@@@@@    @@@@    @@@@    @@@@    @@@@    @@@@       @@@@@@@@         @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@                            @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@         @@@         @@@@@@@@@@@@@@                            @@@@@@@@@@                             @@@")
+	map_set(61,"@@   @                                                                                                                                                                                                                                                                    @@@@@            @")
+	map_set(62,"@    @                                                                                                                                       @@                                                                                                                   @@@                      @")
+	map_set(63,"@    @                                                                                                                                                                                                                                                                                     @")
+	map_set(64,"@    @                                                                                                                                                                                                                                                                                     @")
+	map_set(65,"@    @                                                                                                                                                                                                                                                                                     @")
+	map_set(66,"@    @                                                                                                                                                                                                                                                                                     @")
+	map_set(67,"@   @@                                                                                                                                                                                                                                                                                     @")
+	map_set(68,"@    @                                                                                                                                                                                                                                                                                     @")
+	map_set(69,"@@   @                                                                                                                                                                                                                                                                                     @")
+	map_set(70,"@    @                                                                                                                                                                                                                                                                                     @")
+	map_set(71,"@    @                                                                                                                                                                                                                                                                                     @")
+	map_set(72,"@   @@                                                                                                                                                                                                                                                                                     @")
+	map_set(73,"@    @                                                                                                                                                                                                                                                                                     @") //5
+	map_set(74,"@    @                                                                                                                                                                                                                                                                                     @") //5
+	map_set(75,"@    @                                                                                                                                                                                                                                                                                     @") //5
+	map_set(76,"@    @                                                                                                                                                                                                                                                                                     @") //5 
+	map_set(77,"@@   @                                                                                                                                                                                                                                                                                     @") //5
+	map_set(78,"@                                                                                                                                                                                                                                                                                          @") //5
+	map_set(79,"@                                                                                                                                                                                                                                                                                          @") //5
+	map_set(80,"@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@") //5
+endfunction
+function Setup_MapFINAL()
+	
+	map_set( 0,"                                                                                                                                                                                                                                                                                            ")
+	map_set( 1,"                                                                                                                                                                                                                                                                                            ")
+	map_set( 2,"                                                                                                                                                                                                                                                                                            ")
+	map_set( 3,"                                                                                                                                                                                                                                                                                            ")
+	map_set( 4,"                                                                                                                                                                                                                                                                                            ")
+	map_set( 5,"                                                                                                                                                                                                                                                                                            ")
+	map_set( 6,"                                                                                                                                                                                                                                                                                            ")
+	map_set( 7,"                                                                                                                                                                                                                                                                                            ")
+	map_set( 8,"                                                                                                                                                                                                                                                                                            ")
+	map_set( 9,"                                                                                                                                                                                                                                                                                            ")
+	map_set(10,"                                                                                                                                                                                                                                                                                            ")
+	map_set(11,"                                                                                                                                                                                                                                                                                            ")
+	map_set(12,"                                                                                                                                                                                                                                                                                            ")
+	map_set(13,"                                                                                                                                                                                                                                                                                            ")
+	map_set(14,"                                                                                                                                                                                                                                                                                            ")
+	map_set(15,"                                                                                                                                                                                                                                                                                            ")
+	map_set(16,"                                                                                                                                                                                                                                                                                            ")
+	map_set(17,"                                                                                                                                                                                                                                                                                            ")
+	map_set(18,"                                                                                                                                                                                                                                                                                            ")
+	map_set(19,"                                                                                                                                                                                                                                                                                            ")
+	map_set(20,"                                                                                                                                                                                                                                                                                            ")
+	map_set(21,"                                                                                                                                                                                                                                                                                            ")
+	map_set(22,"                                                                                                                                                                                                                                                                                            ")
+	map_set(23,"                                                                                                                                                                                                                                                                                            ")
+	map_set(24,"                                                                                                                                                                                                                                                                                            ")
+	map_set(25,"                                                                                                                                                                                                                                                                                            ")
+	map_set(26,"                                                                                                                                                                                                                                                                                            ")
+	map_set(27,"                                                                                                                                                                                                                                                                                            ")
+	map_set(28,"                                                                                                                                                                                                                                                                                            ")
+	map_set(29,"                                                                                                                                                                                                                                                                                            ")
+	map_set(30,"                                                                                                                                                                                                                                                                                            ")
+	map_set(31,"                                                                                                                                                                                                                                                                                            ")
+	map_set(32,"                                                                                                                                                                                                                                                                                            ")
+	map_set(33,"                                                                                                                                                                                                                                                                                            ")
+	map_set(34,"                                                                                                                                                                                                                                                                                            ")
+	map_set(35,"                                                                                                                                                                                                                                                                                            ")
+	map_set(36,"                                                                                                                                                                                                                                                                                            ")
+	map_set(37,"                                                                                                                                                                                                                                                                                            ")
+	map_set(38,"                                                                                                                                                                                                                                                                                            ")
+	map_set(39,"                                                                                                                                                                                                                                                                                            ")
+	map_set(40,"                                                                                                                                                                                                                                                                                            ")
+	map_set(41,"                                                                                                                                                                                                                                                                                            ")
+	map_set(42,"                                                                                                                                                                                                                                                                                            ")
+	map_set(43,"                                                                                                                                                                                                                                                                                            ")
+	map_set(44,"                                                                                                                                                                                                                                                                                            ")
+	map_set(45,"                                                                                                                                                                                                                                                                                            ")
+	map_set(46,"                                                                                                                                                                                                                                                                                            ")
+	map_set(47,"                                                                                                                                                                                                                                                                                            ")
+	map_set(48,"                                                                                                                                                                                                                                                                                            ")
+	map_set(49,"                                                                                                                                                                                                                                                                                            ")
+	map_set(50,"                                                                                                                                                                                                                                                                                            ")
+	map_set(51,"                                                                                                                                                                                                                                                                                            ")
+	map_set(52,"                                                                                                                                                                                                                                                                                            ")
+	map_set(53,"                                                                                                                                                                                                                                                                                            ")
+	map_set(54,"                                                                                                                                                                                                                                                                                            ")
+	map_set(55,"                                                                                                                                                                                                                                                                                            ")
+	map_set(56,"                                                                                                                                                                                                                                                                                            ")
+	map_set(57,"                                                                                                                                                                                                                                                                                            ")
+	map_set(58,"                                                                                                                                                                                                                                                                                            ")
+	map_set(59,"                                                                                                                                                                                                                                                                                            ")
+	map_set(60,"                                                                                                                                                                                                                                                                                            ")
+	map_set(61,"                                                                                                                                                                                                                                                                                            ")
+	map_set(62,"                                                                                                                                                                                                                                                                                            ")
+	map_set(63,"                                                                                                                                                                                                                                                                                            ")
+	map_set(64,"                                                                                                                                                                                                                                                                                            ")
+	map_set(65,"                                                                                                                                                                                                                                                                                            ")
+	map_set(66,"                                                                                                                                                                                                                                                                                            ")
+	map_set(67,"                                                                                                                                                                                                                                                                                            ")
+	map_set(68,"                                                                                                                                                                                                                                                                                            ")
+	map_set(69,"                                                                                                                                                                                                                                                                                            ")
+	map_set(70,"                                                                                                                                                                                                                                                                                            ")
+	map_set(71,"                                                                                                                                                                                                                                                                                            ")
+	map_set(72,"                                                                                                                                                                                                                                                                                            ")
+	map_set(73,"@@@@@@@@@@@@@@@@                                                                                                                                                                                                                                                                            ") //6
+	map_set(74,"@              @                                                                                                                                                                                                                                                                            ") //6
+	map_set(75,"@              @                                                                                                                                                                                                                                                                            ") //6
+	map_set(76,"@      @       @                                                                                                                                                                                                                                                                            ") //6 
+	map_set(77,"@      @       @                                                                                                                                                                                                                                                                            ") //6
+	map_set(78,"@      @       @                                                                                                                                                                                                                                                                            ") //6
+	map_set(79,"@  S   @    o  @                                                                                                                                                                                                                                                                            ") //6
+	map_set(80,"@@@@@@@@@@@@@@@@                                                                                                                                                                                                                                                                            ") //6
+endfunction
+	function map_set(y,marker$)
+
+   y=map_height-y
+
+   for character_position=1 to map_width+1
+      character_value$=mid$(marker$,character_position)
+
+      x=character_position-1
+
+      if character_value$="S"        `Start marker
+         Billy.pos.x=(x*5.0)
+         Billy.pos.y=(y*5.0)
+      endif
+
+      for n=1 to len(map_tran$)
+         if mid$(map_tran$,n)=character_value$ then map(x,y).block=n-1
+      next n
+
+      map(x,y).marker$=character_value$
+   next character_position
+
+endfunction
+function update_player()
+
+   `** Save the player's current position  
+   Billy.sav.x = Billy.pos.x
+   Billy.sav.y = Billy.pos.y
+
+   `Left and Right movement control
+   Movement = Stationary
+   
+   if leftkey()=1 then Movement = Left_Move
+   if rightkey()=1 then Movement = Right_Move
+
+   `Adjust player speeds
+   if Movement = Left_Move then dec Billy.xspeed,0.4
+   if Movement = Right_Move then inc Billy.xspeed,0.4
+   if Movement = Stationary
+        Billy.xspeed = Billy.xspeed/1.4
+        if Billy.xspeed>-0.05 and Billy.xspeed<0.05 then Billy.xspeed=0.0
+   endif
+
+   `Limit player speed
+   if Billy.xspeed < -1.0 then Billy.xspeed = -1.0
+   if Billy.xspeed > 1.0 then Billy.xspeed = 1.0
+
+
+   `Update animation
+   if Billy.frame<49
+      `Static or moving
+      if Movement = Stationary
+         Billy.frame=10.0+(sin(timer()/10.0)*7.0)
+      else
+         if Billy.frame<19 then Billy.frame=19 : Billy.smooth=1.0
+         inc Billy.frame,abs(Billy.xspeed*2.0)
+         if Billy.frame>44 then dec Billy.frame,20.0
+      endif
+   else  `Jumping
+      inc Billy.frame,0.5
+      if Billy.frame>51 then Billy.frame=51
+   endif
+
+   `Update player position
+   inc Billy.pos.y,Billy.yspeed
+   inc Billy.pos.x,Billy.xspeed
+   `Increase player drop rate
+   dec Billy.yspeed,0.2
+   if Billy.yspeed<-2.5 then Billy.yspeed=-2.5
+
+   `USAGE:x#,y#,Radius#,Height#
+   colb=character_col(Billy.pos.x, Billy.pos.y, Billy.radius, Billy.height)
+
+   if colb=1
+      if character_col(Billy.pos.x,Billy.sav.y,Billy.radius, Billy.height)=1 then Billy.pos.x=Billy.sav.x
+      if character_col(Billy.sav.x,Billy.pos.y,Billy.radius, Billy.height)=1
+         Billy.pos.y=Billy.sav.y
+         if Billy.yspeed<0 then Billy.yspeed=Billy.yspeed*0.5 else Billy.yspeed=0
+         if Billy.frame>50 then Billy.frame=0.0
+         Billy.smooth=2.0
+      endif
+      if character_col(Billy.pos.x,Billy.pos.y,Billy.radius, Billy.height)=1  `Safety measure, avoid sticking
+         Billy.pos.x=Billy.sav.x : Billy.xspeed=0.0
+         Billy.pos.y=Billy.sav.y : Billy.yspeed=0.0
+      endif
+   endif
+
+   if keystate(57)=0 and upkey()=1 and character_col(Billy.pos.x,Billy.pos.y-1.5,Billy.radius, Billy.height)=1
+		`changed spacebar to up key
+		stop sound cSJUMP
+        if s = 1 then stop sound cSJUMP: play sound cSJUMP //plays jumping sound IF sounds are set to on
+      Billy.yspeed=3.5
+      Billy.frame=51
+      Billy.smooth=3.0
+   endif
+   
+   //space + jump = SUPER JUMP
+      if keystate(57)=1 and upkey()=1 and character_col(Billy.pos.x,Billy.pos.y-1.5,Billy.radius, Billy.height)=1
+		stop sound cSJUMP
+		stop sound cSSUPERJUMP
+        if s = 1 then stop sound cSJUMP: play sound cSJUMP //plays jumping sound IF sounds are set to on
+        if s = 1 then stop sound cSSUPERJUMP: play sound cSSUPERJUMP
+      Billy.yspeed=5.0
+      Billy.frame=51
+      Billy.smooth=3.0
+   endif
+
+   `Update player direction Left:Pdir=-1, Right:Pdir=1
+   if Billy.xspeed>0.2 and pdir<1 then pdir=1
+   if Billy.xspeed<-0.2 and pdir>-1 then pdir=-1
+   if pdir<0 then dec pdir#,0.3
+   if pdir>0 then inc pdir#,0.3
+
+   `Limit Pdir
+   if pdir#>1.0 then pdir#=1.0
+   if pdir#<-1.0 then pdir#=-1.0
+
+   `Update player animation smoothing
+   dec Billy.smooth,0.1
+   if Billy.smooth < 0 then Billy.smooth = 0 else set object interpolation Billy.id, Billy.smooth
+
+   `Update player position etc
+   position object Billy.id,Billy.pos.x,Billy.pos.y,0
+   rotate object Billy.id, 0, pdir#*-90.0, 0
+   set object frame Billy.id,Billy.frame
+
+endfunction
+function update_pickups()
+
+   ang#=timer()/3.0
+
+   for y=0 to map_height
+      for x=0 to map_width
+
+      if map(x,y).block=2
+         rotate object map(x,y).id,0,ang#+(map_width*10.0),0
+      endif
+
+      next x
+   next y
+
+endfunction
+function character_col(x_pos#,y_pos#,rad#,height#)
+
+   col=0
+   charcol=0
+
+   for yy=0 to 2
+      for xx=0 to 2
+
+         xx#=0.0
+         if xx=2 then xx#=rad#
+         if xx=0 then xx#=0.0-rad#
+
+         yy#=height#/2.0
+         if yy=0 then yy#=height#
+         if yy=2 then yy#=0
+
+         col=map_block(x_pos#+xx#,y_pos#+yy#)
+         if col=1 then charcol=1
+
+         if col=2
+            if map(retx,rety).state=0
+            	if s = 1 then stop sound cSDOTHIT : play sound cSDOTHIT
+               inc jewel_score,1
+               obj=map(retx,rety).id
+               map(retx,rety).state=1
+               map(x,y).block=0
+               hide object obj
+            endif
+         endif
+
+         char_col(xx,yy)=col
+
+      next xx
+   next yy
+
+endfunction charcol
+function map_block(x#,y#)
+
+   x=int(x#/5.0)
+   y=int(y#/5.0)
+
+   if x<0 then x=0
+   if x>map_width then x=map_width
+   if y<0 then y=0
+   if y>map_height then y=map_height
+
+   retx=x
+   rety=y
+
+   col=map(x,y).block
+
+endfunction col
+function DisplaySplashScreen()
+
+cls
+   backdrop on
+  color backdrop RGB(0,0,0)
+set text transparent
+  ink rgb(255,255,255),rgb(0,0,0) 
+  set text size 48
+  set text font "comic sans ms"
+  
+  text 300,100,"Platformer Game"
+
+  text 300,150,">2012"
+  text 300, 200, "Press SPACE to start."
+  text 300, 300, "A Game by Damon Wareham"
+  ink rgb(0,255,255),rgb(0,0,0)
+  if message = 0 then text 300, 500, "I want to play a game."
+  if message = 1 then text 300, 500, "Now with less fail!"
+  if message = 2 then text 300, 500, "Alright let's do this! LEEEROY..."
+  if message = 3 then text 200, 500, "More fun than a keg full of Pepsi!"
+  if message = 4 then text 200, 500, "It's a platforming game. No more, no less."
+  if message = 5 then text 300, 500, "^This guy is a LOSER"
+  if message = 6 then text 200, 500, "I didn't get this random message idea from Minecraft!"
+  if message = 7 then text 300, 500, "50% less fun than outside!"
+  if message = 8 then set text size 8 : text 300, 500, "If you can read this then this game is awesome"
+  if message = 9 then text 100, 500, "Try the new improved edition! All you need is to give me money!"
+  sync 
+  
+  cls
+	if keystate(57) = 0 then displaysplashscreen()
+endfunction
+
+function DisplayInstructions()
+
+	backdrop on
+	color backdrop RGB(0,0,0)
+	set text transparent
+	set text size 48
+	set text font "arial"
+	  ink rgb(255,255,255),rgb(0,0,0)
+	  
+	text 300, 50, "Collect dots and jump."
+	set text size 24
+	text 300, 100, "Or get the dot at the end, depending on the level."
+	set text size 48
+text 150, 150, "Use the left and right arrow keys" 
+text 160, 200, "to move left and right."
+text 150, 300, "Press the up arrow key to jump."
+text 150, 350, "Hold Spacebar and press the up"
+text 160, 400, "arrow key to SUPER JUMP!"
+text 150, 450, "Press P to pause in-game."
+text 150, 550, "Collect all of the dots to win!"
+	text 200, 650, "Press the A key to start."
+	sync
+	
+	cls
+	if keystate(30) = 0 then displayinstructions()
+	if keystate(1) = 1 then exitscreen()
+endfunction
+
+function rave()
+	if timer() > timer1 + 50
+ 		//r=rnd(255) : g=rnd(255) : b=rnd(255)
+ 		inc startr : dec startg : inc startb,3
+        	color backdrop rgb(startr,startg,startb)
+     	timer1 = timer()
+    endif
+endfunction
+
+function endgame()
+for R=1 to 1000
+	if object exist (R) = 1 then delete object (R)
+next R
+cls
+m = 0
+if map = 1 then L1 = 1
+if map = 2 then L2 = 1
+if map = 4 then L4 = 1
+stop music 1
+stop music 2
+stop music 3
+stop music 4
+stop music 5
+stop music 6
+loop music 7
+backdrop on
+	color backdrop RGB(0,0,0)
+  ink rgb(255,255,255),rgb(0,0,0)
+  set text size 48
+  
+	text 200, 50, "You collected all the dots." 
+	text 200, 100, "You've completed the level!"
+	text 200, 200, "Press BACKSPACE to restart,"
+	text 200, 250, "to select a different level and options."
+	text 200, 300, "Or Q to exit the game."
+	
+	ink rgb(0,128,0),rgb(0,0,0)
+	if skip = 0 and messagew = 0 then text 200, 500, "Could have done that better."
+	if skip =  0 and messagew = 1 then text 200, 500, "Chuck Norris beat this level by staring at it."
+	if skip = 0 and messagew = 2 then text 50, 500,  "Er. Not bad. I guess... Who am I kidding. Do that again."
+	if skip = 0 and messagew = 3 then text 50, 500, "Beat that using your feet and I'll be impressed."
+	if skip = 0 and messagew = 4 then text 200, 500, "It needs to be about 20% cooler."
+	if skip = 0 and messagew = 5 then text 200, 500, "Go play another level, I dare you."
+	if skip = 1 then text 200, 500, "That skip button is cool, isn't it?"
+	sync
+	
+	cls
+	if keystate(16) = 1 then end
+	if keystate(14) = 0 then endgame()
+	if keystate(14) = 1 then stop music 7 : startgame()
+endfunction
+
+function endgame2()
+for R=1 to 1000
+	if object exist (R) = 1 then delete object (R)
+next R
+cls
+m = 0
+if map = 3 then L3 = 1
+if map = 5 then L5 = 1
+stop music 1
+stop music 2
+stop music 3
+stop music 4
+stop music 5
+stop music 6
+loop music 7
+backdrop on
+	color backdrop RGB(0,0,0)
+  ink rgb(255,255,255),rgb(0,0,0)
+  set text size 48
+  
+	text 200, 50, "You reached the finish and got the dot." 
+	text 200, 100, "You've completed the level!"
+	text 200, 200, "Press BACKSPACE to restart,"
+	text 200, 250, "to select a different level and options."
+	text 200, 300, "Or Q to exit the game."
+	
+	ink rgb(0,128,0),rgb(0,0,0)
+	if skip = 0 and messagew = 0 then text 200, 500, "Big deal. I could do that in ten seconds flat."
+	if skip = 0 and messagew = 1 then text 200, 500, "How many times did you fall?"
+	if skip = 0 and messagew = 2 then text 200, 500,  "I'd rate that 3/5. Must try harder."
+	if skip = 0 and messagew = 3 then text 200, 500, "A passable effort. I guess."
+	if skip = 0 and messagew = 4 then text 200, 500, "The game. You still just lost."
+	if skip = 0 and messagew = 5 then text 200, 500, "DO. IT. FASTER!"
+	if skip = 1 then text 200, 500, "That skip button is cool, isn't it?"
+	sync
+	
+	cls
+	if keystate(16) = 1 then end
+	if keystate(14) = 0 then endgame2()
+	if keystate(14) = 1 then stop music 7 : startgame()
+endfunction
+
+function endgame3()
+for R=1 to 1000
+	if object exist (R) = 1 then delete object (R)
+next R
+cls
+m = 0
+L6 = 1
+stop music 1
+stop music 2
+stop music 3
+stop music 4
+stop music 5
+stop music 6
+loop music 8
+backdrop on
+	color backdrop RGB(0,0,0)
+  ink rgb(255,255,255),rgb(0,0,0)
+  set text size 48
+  
+	text 200, 50, "You beat the final level!"
+	ink rgb(255,0,0), rgb(0,0,0)
+	text 200, 100, "You've WON THE GAME!"
+	ink rgb(255,255,255), rgb(0,0,0)
+	text 200, 200, "Press BACKSPACE to restart,"
+	text 200, 250, "to select a different level and options."
+	text 200, 300, "Or Q to exit the game."
+	
+	ink rgb(0,128,0),rgb(0,0,0)
+	if skip = 0 then text 200, 500, "Son, I am proud."
+	if skip = 1 then text 200, 500, "That skip button is cool, isn't it?"
+	ink rgb(255,0,255),rgb(0,0,0)
+	if skip = 0 then text 150, 550, "You can now skip levels using the LEFT CTRL key!"
+	sync
+	
+	cls
+	if keystate(16) = 1 then end
+	if keystate(14) = 0 then endgame3()
+	if keystate(14) = 1 then stop music 8 : startgame()
+endfunction
+
+function pause()
+	if keystate(22) = 1 then exitfunction
+	wait 50
+	set text size 72
+	ink rgb(255,255,255),rgb(0,0,0)
+	box 200,200,750,500
+	ink rgb(0,0,0),rgb(0,0,0)
+	text 200, 200, "PAUSED: Press U" 
+	text 225, 250, "to continue."
+	set text size 32
+	text 200, 350, "Arrow keys left/right to move left/right"
+	text 200, 400, "Up arrow key to jump"
+	text 200, 450, "Space bar + up arrow key to super jump"
+	   ink rgb(255,255,255), rgb(255,255,255)
+ 	if map = 1 or map = 2 or map = 4 then box 0,0,160,30
+ 	if map = 3 or map = 5 or map = 6 then box 0,0,390,30
+	ink rgb(0,0,0),rgb(0,0,0)
+   if map = 1 or map = 2 or map = 4 then text 0,0,"Dots: "+str$(jewel_score)+"\"+str$(jewel_count)
+   if map = 3 or map = 5 then text 0,0,"Reach the finish and get the dot!"
+   if map = 6 then text 0,0,"Final level! Get that dot!"
+	sync
+	pause()
+endfunction
+
+function exitscreen()
+for R=1 to 1000
+	if object exist (R) = 1 then delete object (R)
+next R
+m = 0
+//stops all music and deletes all objects
+cls
+stop music 1
+stop music 2
+stop music 3
+stop music 4
+stop music 5
+stop music 6
+backdrop on
+	color backdrop RGB(0,0,0)
+  ink rgb(255,255,255),rgb(0,0,0)
+  set text size 48
+  
+	text 200, 50, "Are you sure you want to quit?"
+	text 200, 200, "Press BACKSPACE to restart the game,"
+	text 200, 250, "to select a different level and options."
+	text 200, 300, "Or ENTER to quit the game."
+	
+	ink rgb(255,0,0),rgb(0,0,0)
+	if messageq = 0 then text 200, 500, "Quitter."
+	if messageq = 1 then text 200, 500, "So, you're taking the blue pill?"
+	if messageq = 2 then text 200, 500,  "Son, I am dissapoint. Play more."
+	if messageq = 3 then text 200, 500, "You'd better choose the first option."
+	if messageq = 4 then text 200, 500, "Trying again, or leaving like the rest?"
+	if messageq = 5 then text 200, 500, "Didn't think this game was THAT bad."
+	sync
+	
+	cls
+	if keystate(28) = 1 then end
+	if keystate(14) = 0 then exitscreen()
+	if keystate(14) = 1 then startgame()
+endfunction
+
+function musicscreen()
+cls
+
+backdrop on
+	color backdrop RGB(0,0,0)
+  ink rgb(255,255,255),rgb(0,0,0)
+  set text size 48
+  
+text 200, 50, "Select your music:"
+set text size 32
+text 200, 150, "Press 1 for Body in Motion, from Wipeout 2097."
+text 200, 200, "Press 2 for Metal Squad, from Thunder Force IV."
+text 200, 250, "Press 3 for Hard Road, from Super Hang-On."
+text 200, 300, "Press 4 for A Ray of Hope, from Thunder Force II."
+text 200, 350, "Press 5 for Venus Fire, from Thunder Force III."
+text 200, 400, "Press 6 for Head First, from Air Combat."
+text 200, 450, "Press 7 for no music."
+sync
+
+cls
+if keystate(2) = 1 then m = 1
+if keystate(3) = 1 then m = 2
+if keystate(4) = 1 then m = 3
+if keystate(5) = 1 then m = 4
+if keystate(6) = 1 then m = 5
+if keystate(7) = 1 then m = 6
+if keystate(8) = 1 then m = 7
+if m = 0 then musicscreen()
+endfunction
+
+function soundscreen()
+cls
+
+backdrop on
+	color backdrop RGB(0,0,0)
+  ink rgb(255,255,255),rgb(0,0,0)
+  set text size 48
+  
+text 200, 50, "Sound options:"
+set text size 32
+text 200, 150, "Press S for sounds to PLAY."
+text 200, 200, "Press D for sounds to NOT PLAY."
+sync
+
+cls
+if keystate(31) = 1 then s = 1
+if keystate(32) = 1 then s = 2
+if s = 0 then soundscreen()
+endfunction
+
+function ravescreen()
+cls
+
+backdrop on
+	color backdrop RGB(0,0,0)
+  ink rgb(255,255,255),rgb(0,0,0)
+  set text size 48
+  
+text 200, 50, "Theme options:"
+set text size 32
+text 200, 150, "Press T for the METAL + RAVE theme."
+text 200, 200, "Press Y for the COLOURS theme."
+text 200, 250, "Press U for the METAL theme."
+sync
+
+cls
+if keystate(20) = 1 then v = 1
+if keystate(21) = 1 then v = 2
+if keystate(22) = 1 then v = 3
+if v = 0 then ravescreen()
+endfunction
+
+function mapscreen()
+cls
+
+backdrop on
+	color backdrop RGB(0,0,0)
+  ink rgb(255,255,255),rgb(0,0,0)
+  set text size 48
+  
+
+text 200, 50, "Select your level:"
+set text size 32
+if L1 = 0 then ink rgb(255,255,255), rgb(0,0,0) : text 200, 150, "Press 1 for Level 1: Generic board (Dot Collection)."
+if L1 = 1 then ink rgb(0,128,0),rgb(0,0,0) : text 200, 150, "Press 1 for Level 1: Generic board (COMPLETED!)."
+if L2 = 0 then ink rgb(255,255,255), rgb(0,0,0) : text 200, 200, "Press 2 for Level 2: Labyrinth (Dot Collection)."
+if L2 = 1 then ink rgb(0,128,0), rgb(0,0,0) : text 200, 200, "Press 2 for Level 2: Labyrinth (COMPLETED!)."
+if L3 = 0 then ink rgb(255,255,255),rgb(0,0,0) : text 200, 250, "Press 3 for Level 3: Spiral race (Single-dot Rush)."
+if L3 = 1 then ink rgb(0,128,0), rgb(0,0,0) : text 200, 250, "Press 3 for Level 3: Spiral race (COMPLETED!)."
+if L4 = 0 then ink rgb(255,255,255), rgb(0,0,0) : text 200, 300, "Press 4 for Level 4: Multislide (Dot Collection)."
+if L4 = 1 then ink rgb(0,128,0), rgb(0,0,0) : text 200, 300, "Press 4 for Level 4: Multislide (COMPLETED!)."
+if L5 = 0 then ink rgb(255,255,255), rgb(0,0,0) : text 200, 350, "Press 5 for Level 5: The stretch (Single-dot Rush)."
+if L5 = 1 then ink rgb(0,128,0), rgb(0,0,0) : text 200, 350, "Press 6 for Level 5: The stretch (COMPLETED!)."
+
+
+if L1 = 0 or L2 = 0 or L3 = 0 or L4 = 0 or L5 = 0 then ink rgb(255,255,255), rgb(0,0,0) : text 200, 500, "Complete all 5 levels to get the final level..."
+if L1 = 1 then if L2 = 1 then if L3 = 1 then if L4 = 1 then if L5 = 1 then ink rgb(255,0,255), rgb(0,0,0) : text 200, 500, "All levels complete! Press 6 for the final level..."
+sync
+cls
+if keystate(2) = 1 then map = 1
+if keystate(3) = 1 then map = 2
+if keystate(4) = 1 then map = 3
+if keystate(5) = 1 then map = 4
+if keystate(6) = 1 then map = 5
+if L1 = 1 and L2 = 1 and L3 = 1 and L4 = 1 and L5 = 1 and keystate(7) = 1 then map = 6
+if map = 0 then mapscreen()
+endfunction
